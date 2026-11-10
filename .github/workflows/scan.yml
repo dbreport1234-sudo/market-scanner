@@ -1,0 +1,37 @@
+name: Market Scanner & Discord Alert
+
+on:
+  schedule:
+    # รันทุกๆ 15 นาที (24 ชั่วโมง)
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # กดรันเองด้วยมือได้ตลอดเวลา
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Market Scanner
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python scanner.py
+
+      - name: Commit and push updated JSON data
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add data.json alert_state.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update market scan data" && git push)
