@@ -65,12 +65,12 @@
               <th class="p-4 text-right">ราคาล่าสุด</th>
               <th class="p-4 text-right">RSI (14)</th>
               <th class="p-4 text-center">สัญญาณ</th>
-              <th class="p-4">เป้า TP / SL</th>
+              <th class="p-4">Entry / TP1-3 / SL</th>\n              <th class="p-4 text-right">คะแนน</th>
               <th class="p-4">บทวิเคราะห์</th>
             </tr>
           </thead>
           <tbody id="tableBody" class="divide-y divide-slate-800/70 text-sm">
-            <tr><td colspan="7" class="p-8 text-center text-slate-500">กำลังโหลดข้อมูล...</td></tr>
+            <tr><td colspan="8" class="p-8 text-center text-slate-500">กำลังโหลดข้อมูล...</td></tr>
           </tbody>
         </table>
       </div>
@@ -97,7 +97,7 @@
         renderTable();
       } catch (e) {
         document.getElementById('tableBody').innerHTML = 
-          `<tr><td colspan="7" class="p-8 text-center text-rose-400">ยังไม่มีข้อมูล data.json (กรุณารัน GitHub Actions รอบแรกก่อน)</td></tr>`;
+          `<tr><td colspan="8" class="p-8 text-center text-rose-400">ยังไม่มีข้อมูล data.json (กรุณารัน GitHub Actions รอบแรกก่อน)</td></tr>`;
       }
     }
 
@@ -137,7 +137,7 @@
 
         const changeColor = item.change_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
         const marketBadge = item.market === 'THAI' ? '🇹🇭 TH' : item.market === 'US' ? '🇺🇸 US' : '🪙 CRYPTO';
-        const tpsl = item.tp ? `<span class="text-emerald-400">TP: ${item.tp}</span><br><span class="text-rose-400 text-xs">SL: ${item.sl}</span>` : '-';
+        const tpsl = item.signal === 'BUY' ? `<span class="text-sky-300">Entry: ${item.entry}</span><br><span class="text-emerald-400">TP1: ${item.tp1}</span><br><span class="text-emerald-400">TP2: ${item.tp2}</span><br><span class="text-emerald-400">TP3: ${item.tp3}</span><br><span class="text-rose-400">SL: ${item.sl}</span><br><span class="text-slate-500">R:R ${item.risk_reward || '-'}</span>` : (item.sl ? `<span class="text-rose-400">SL: ${item.sl}</span>` : '-');
 
         return `
           <tr class="hover:bg-slate-800/40 transition">
@@ -156,7 +156,7 @@
               </span>
             </td>
             <td class="p-4 font-mono text-xs">${tpsl}</td>
-            <td class="p-4 text-slate-300 text-xs max-w-xs">${item.reason}</td>
+            <td class="p-4 text-right font-mono font-bold text-amber-300">${item.score ?? 0}/100</td>\n            <td class="p-4 text-slate-300 text-xs max-w-xs">${item.reason}</td>
           </tr>
         `;
       }).join('');
