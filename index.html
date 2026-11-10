@@ -97,7 +97,7 @@
     </section>
 
     <!-- Desktop/tablet table -->
-    <section class="hidden md:block bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+    <section id="desktopTableSection" class="hidden md:block bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
       <div class="table-wrap">
         <table class="w-full text-left border-collapse">
           <thead>
@@ -234,6 +234,7 @@
       const mobile = document.getElementById('mobileList');
       const table = document.getElementById('tableBody');
       if (!filtered.length) {
+        if (currentView === 'charts') renderCharts([]);
         mobile.innerHTML = '<div class="asset-card text-center text-slate-500 sm:col-span-2">ไม่พบรายการที่ตรงกับเงื่อนไข</div>';
         table.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500">ไม่พบรายการที่ตรงกับเงื่อนไข</td></tr>';
         return;
@@ -250,7 +251,7 @@
     function setView(view) {
       currentView = view;
       const mobile = document.getElementById('mobileList');
-      const desktop = document.querySelector('section.hidden.md\\:block');
+      const desktop = document.getElementById('desktopTableSection');
       const charts = document.getElementById('chartsView');
       mobile.style.display = view === 'list' ? '' : 'none';
       if (desktop) desktop.style.display = view === 'list' ? '' : 'none';
