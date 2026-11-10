@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0f19" />
+  <meta name="application-name" content="Market Radar" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Market Radar" />
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="apple-touch-icon" href="data:image/png;base64,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" />
+  <link rel="manifest" href="./manifest.json" />
   <title>Multi-Market Signal Radar</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -47,9 +54,14 @@
   <main class="page-shell max-w-7xl mx-auto px-4 py-6 md:px-8 md:py-8">
     <header class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
       <div class="min-w-0">
-        <h1 class="brand-title text-2xl md:text-3xl font-bold text-white">📡 Multi-Market Signal Radar</h1>
-        <p class="text-slate-400 text-xs sm:text-sm mt-1">หุ้นไทย • หุ้นสหรัฐฯ • คริปโต <span class="text-indigo-300">TF 15m</span></p>
-      </div>
+        <div class="flex items-center gap-3 min-w-0">
+          <img src="./icon.svg" alt="Market Radar" width="48" height="48" class="shrink-0 rounded-xl shadow-lg" />
+          <div class="min-w-0"><h1 class="brand-title text-2xl md:text-3xl font-bold text-white">Multi-Market Signal Radar</h1>
+          <p class="text-slate-400 text-xs sm:text-sm mt-1">หุ้นไทย • หุ้นสหรัฐฯ • คริปโต <span class="text-indigo-300">TF 15m</span></p></div>
+        </div>
+        <div class="flex flex-col sm:items-end gap-2">
+          <button id="installAppBtn" type="button" onclick="installMarketRadar()" class="hidden rounded-lg border border-indigo-400/50 bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg">＋ ติดตั้งแอป</button>
+        </div>
       <div class="text-xs bg-slate-800/80 border border-slate-700 px-3 py-2.5 rounded-lg text-slate-300 w-full sm:w-auto">
         อัปเดตล่าสุด: <span id="updatedAt" class="text-emerald-400 font-medium">กำลังโหลด...</span><span id="refreshHint" class="text-slate-500 ml-1">· สแกนทุก 15 นาที</span>
       </div>
@@ -328,6 +340,44 @@
       }
     }
 
+    let installPromptEvent = null;
+    const installButton = document.getElementById('installAppBtn');
+    function isIOSDevice() { return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream; }
+    function showInstallButton() {
+      if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) {
+        installButton.classList.add('hidden');
+        return;
+      }
+      installButton.classList.remove('hidden');
+      installButton.textContent = installPromptEvent ? '＋ ติดตั้งแอป' : (isIOSDevice() ? '＋ เพิ่มลงหน้าจอหลัก' : 'วิธีติดตั้งแอป');
+    }
+    async function installMarketRadar() {
+      if (installPromptEvent) {
+        installPromptEvent.prompt();
+        await installPromptEvent.userChoice;
+        installPromptEvent = null;
+        showInstallButton();
+        return;
+      }
+      if (isIOSDevice()) {
+        alert('วิธีติดตั้งบน iPhone/iPad:\\n1. เปิดเว็บนี้ด้วย Safari\\n2. แตะปุ่มแชร์ (สี่เหลี่ยมมีลูกศรขึ้น)\\n3. เลือก “เพิ่มไปยังหน้าจอโฮม” (Add to Home Screen)\\n4. แตะ “เพิ่ม”');
+      } else {
+        alert('เปิดเมนูของเบราว์เซอร์ แล้วเลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”');
+      }
+    }
+    window.addEventListener('beforeinstallprompt', event => {
+      event.preventDefault();
+      installPromptEvent = event;
+      showInstallButton();
+    });
+    window.addEventListener('appinstalled', () => {
+      installPromptEvent = null;
+      installButton.classList.add('hidden');
+    });
+    showInstallButton();
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.warn('PWA service worker:', err)));
+    }
     updateFilterButtons();
     loadData();
     setInterval(loadData, 60000);
