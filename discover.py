@@ -66,13 +66,13 @@ def fetch_set_universe():
     parser.feed(response.text)
     visible = " ".join(parser.parts)
     # SET's public stock-quote page lists common-stock symbols in its visible content.
-    tokens = re.findall(r"(?<![A-Z0-9])([A-Z][A-Z0-9]{0,5})(?![A-Z0-9])", visible.upper())
+    tokens = re.findall(r"(?<![A-Z0-9])([A-Z0-9]{1,6})(?![A-Z0-9])", visible.upper())
     stop = {
         "SET", "TH", "THE", "STOCK", "STOCKS", "MARKET", "COMMON", "WARRANT",
         "PREFERRED", "ETF", "DR", "DW", "FUND", "SEARCH", "QUOTE", "LOGIN",
         "REGISTER", "LANG", "EN", "THAI", "SETTRADE", "HTTPS", "WWW", "OR"
     }
-    symbols = {x for x in tokens if x not in stop and 1 <= len(x) <= 6}
+    symbols = {x for x in tokens if x not in stop and 1 <= len(x) <= 6 and re.search(r"[A-Z]", x)}
     # A valid response should contain a meaningful number of listed tickers.
     if len(symbols) < 100:
         raise RuntimeError(f"SET page parser returned only {len(symbols)} possible symbols")
