@@ -51,7 +51,7 @@
         <p class="text-slate-400 text-xs sm:text-sm mt-1">หุ้นไทย • หุ้นสหรัฐฯ • คริปโต <span class="text-indigo-300">TF 15m</span></p>
       </div>
       <div class="text-xs bg-slate-800/80 border border-slate-700 px-3 py-2.5 rounded-lg text-slate-300 w-full sm:w-auto">
-        อัปเดตล่าสุด: <span id="updatedAt" class="text-emerald-400 font-medium">กำลังโหลด...</span>
+        อัปเดตล่าสุด: <span id="updatedAt" class="text-emerald-400 font-medium">กำลังโหลด...</span><span id="refreshHint" class="text-slate-500 ml-1">· สแกนทุก 15 นาที</span>
       </div>
     </header>
 
@@ -316,6 +316,7 @@
         if (data.updated_at && data.updated_at === lastDataUpdated) return;
         lastDataUpdated = data.updated_at || null;
         document.getElementById('updatedAt').textContent = data.updated_at || '-';
+        document.getElementById('refreshHint').textContent = '· สแกนทุก ' + Number(data.refresh_interval_minutes || 15) + ' นาที';
         document.getElementById('statTotal').textContent = data.summary?.total ?? 0;
         document.getElementById('statBuy').textContent = data.summary?.buy ?? 0;
         document.getElementById('statSell').textContent = data.summary?.sell ?? 0;
