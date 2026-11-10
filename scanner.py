@@ -7,27 +7,19 @@ import numpy as np
 import yfinance as yf
 from datetime import datetime, timezone, timedelta
 
-# ดึง Webhook URL จาก GitHub Secrets
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK_URL", "")
-
-# โหลดรายชื่อจากไฟล์แยกในโฟลเดอร์ lists/
-def load_watchlist():
-    return {
-        "THAI": load_json("lists/thai_stocks.json", []),
-        "US": load_json("lists/us_stocks.json", []),
-        "CRYPTO": load_json("lists/crypto.json", [])
-    }
-
 STATE_FILE = "alert_state.json"
 OUTPUT_FILE = "data.json"
-COOLDOWN_HOURS = 4  # ป้องกันแจ้งเตือนตัวเดิมซ้ำภายใน 4 ชั่วโมง
+COOLDOWN_HOURS = 4
+ATR_SL_MULTIPLIER = 1.5
+TP_R_MULTIPLIERS = (1.0, 2.0, 3.0)
 
 def load_json(filepath, default):
     if os.path.exists(filepath):
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
+        except (OSError, ValueError):
             return default
     return default
 
@@ -35,154 +27,183 @@ def save_json(filepath, data):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-def fetch_crypto_klines(symbol, interval="15m", limit=100):
+def load_watchlist():
+    return {
+        "THAI": load_json("lists/thai_stocks.json", []),
+        "US": load_json("lists/us_stocks.json", []),
+        "CRYPTO": load_json("lists/crypto.json", [])
+    }
+
+def fetch_crypto_klines(symbol, interval="15m", limit=120):
     url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
-    res = requests.get(url, timeout=10)
+    res = requests.get(url, timeout=15)
+    res.raise_for_status()
     data = res.json()
-    if not isinstance(data, list):
+    if not isinstance(data, list) or len(data) < 31:
         return pd.DataFrame()
     df = pd.DataFrame(data, columns=[
         "Time", "Open", "High", "Low", "Close", "Volume",
         "CloseTime", "QuoteVol", "Trades", "TakerBase", "TakerQuote", "Ignore"
     ])
     for col in ["Open", "High", "Low", "Close", "Volume"]:
-        df[col] = df[col].astype(float)
-    return df
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    # Binance returns the currently-forming candle as the final row.
+    now_ms = int(time.time() * 1000)
+    df = df[pd.to_numeric(df["CloseTime"], errors="coerce") < now_ms].copy()
+    return df.reset_index(drop=True)
 
 def fetch_stock_klines(ticker, interval="15m", period="5d"):
-    df = yf.download(ticker, period=period, interval=interval, progress=False)
+    df = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=False)
     if df.empty:
         return pd.DataFrame()
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
+    # Exclude the latest bar if its 15-minute interval has not finished.
+    try:
+        idx = pd.Timestamp(df.index[-1])
+        idx_utc = idx.tz_localize("UTC") if idx.tzinfo is None else idx.tz_convert("UTC")
+        if idx_utc + pd.Timedelta(minutes=15) > pd.Timestamp.now(tz="UTC"):
+            df = df.iloc[:-1]
+    except Exception:
+        # Conservative fallback: don't analyse a potentially-live final candle.
+        df = df.iloc[:-1]
     return df
 
 def calculate_indicators(df):
-    if len(df) < 30:
+    if df is None or len(df) < 35:
         return None
-    
-    close = df["Close"]
-    high = df["High"]
-    low = df["Low"]
-    vol = df["Volume"]
+    df = df.copy()
+    for col in ["Close", "High", "Low", "Volume"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df = df.dropna(subset=["Close", "High", "Low", "Volume"])
+    if len(df) < 35:
+        return None
 
-    # EMA 9 & 21
+    close, high, low, vol = df["Close"], df["High"], df["Low"], df["Volume"]
     ema9 = close.ewm(span=9, adjust=False).mean()
     ema21 = close.ewm(span=21, adjust=False).mean()
-
-    # RSI 14
     delta = close.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    gain = delta.clip(lower=0).rolling(14).mean()
+    loss = (-delta.clip(upper=0)).rolling(14).mean()
     rs = gain / loss.replace(0, np.nan)
     rsi = 100 - (100 / (1 + rs))
+    rsi = rsi.fillna(50)
+    tr = pd.concat([
+        high - low,
+        (high - close.shift()).abs(),
+        (low - close.shift()).abs()
+    ], axis=1).max(axis=1)
+    atr = tr.rolling(14).mean()
+    vol_avg = vol.rolling(20).mean()
 
-    # ATR 14 สำหรับคำนวณจุด TP / SL
-    tr1 = high - low
-    tr2 = (high - close.shift()).abs()
-    tr3 = (low - close.shift()).abs()
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    atr = tr.rolling(window=14).mean()
-
-    # Volume Spike
-    vol_avg = vol.rolling(window=20).mean()
-
-    curr_close = float(close.iloc[-1])
+    price = float(close.iloc[-1])
     prev_close = float(close.iloc[-2])
     curr_rsi = float(rsi.iloc[-1])
-    curr_ema9 = float(ema9.iloc[-1])
-    prev_ema9 = float(ema9.iloc[-2])
-    curr_ema21 = float(ema21.iloc[-1])
-    prev_ema21 = float(ema21.iloc[-2])
-    curr_atr = float(atr.iloc[-1]) if not np.isnan(atr.iloc[-1]) else curr_close * 0.02
-    vol_ratio = float(vol.iloc[-1] / vol_avg.iloc[-1]) if vol_avg.iloc[-1] > 0 else 1.0
+    e9, e21 = float(ema9.iloc[-1]), float(ema21.iloc[-1])
+    p9, p21 = float(ema9.iloc[-2]), float(ema21.iloc[-2])
+    atr_value = float(atr.iloc[-1]) if pd.notna(atr.iloc[-1]) else price * 0.02
+    atr_value = max(atr_value, price * 0.001)
+    avg_volume = float(vol_avg.iloc[-1]) if pd.notna(vol_avg.iloc[-1]) else 0
+    vol_ratio = float(vol.iloc[-1] / avg_volume) if avg_volume > 0 else 1.0
+    pct_change = ((price - prev_close) / prev_close * 100) if prev_close else 0.0
 
-    pct_change = ((curr_close - prev_close) / prev_close) * 100
+    golden_cross = p9 <= p21 and e9 > e21
+    death_cross = p9 >= p21 and e9 < e21
+    trend_up = e9 > e21 and price > e21
+    trend_down = e9 < e21 and price < e21
+    oversold = curr_rsi < 32
+    breakout = vol_ratio > 2.2 and pct_change > 1.0 and curr_rsi < 68
 
-    # วิเคราะห์สัญญาณซื้อ/ขาย
-    signal = "WATCH"
-    reason = "รอดูแนวโน้ม"
-    tp = 0.0
-    sl = 0.0
+    score = 0
+    score += 25 if trend_up else 0
+    score += 25 if golden_cross else (15 if e9 > e21 else 0)
+    score += 20 if 40 <= curr_rsi <= 65 else (15 if oversold else 0)
+    score += 20 if vol_ratio >= 1.5 else (10 if vol_ratio >= 1.1 else 0)
+    score += 10 if pct_change > 0 else 0
+    score = min(100, score)
 
-    # เงื่อนไข BUY
-    if curr_rsi < 32:
-        signal = "BUY"
-        reason = f"RSI ต่ำโซน Oversold ({curr_rsi:.1f}) ลุ้นเด้งกลับ"
-        sl = curr_close - (1.5 * curr_atr)
-        tp = curr_close + (2.5 * curr_atr)
-    elif prev_ema9 <= prev_ema21 and curr_ema9 > curr_ema21 and curr_rsi < 65:
-        signal = "BUY"
-        reason = "Golden Cross (EMA9 ตัดขึ้น EMA21)"
-        sl = curr_close - (1.5 * curr_atr)
-        tp = curr_close + (3.0 * curr_atr)
-    elif vol_ratio > 2.2 and pct_change > 1.0 and curr_rsi < 68:
-        signal = "BUY"
-        reason = f"Volume เข้าผิดปกติ ({vol_ratio:.1f}x) ราคาเบรกขึ้น"
-        sl = curr_close - (1.5 * curr_atr)
-        tp = curr_close + (2.5 * curr_atr)
-
-    # เงื่อนไข SELL / TAKE PROFIT
+    signal, reason = "WATCH", "รอสัญญาณยืนยัน"
+    if oversold:
+        signal, reason = "BUY", f"RSI Oversold ({curr_rsi:.1f}) รอสัญญาณกลับตัว"
+    elif golden_cross and curr_rsi < 65:
+        signal, reason = "BUY", "EMA9 ตัดขึ้น EMA21 (Golden Cross)"
+    elif breakout:
+        signal, reason = "BUY", f"Volume สูงกว่าค่าเฉลี่ย {vol_ratio:.1f} เท่า พร้อมราคาเบรกขึ้น"
     elif curr_rsi > 72:
-        signal = "SELL"
-        reason = f"RSI สูงโซน Overbought ({curr_rsi:.1f}) ควรแบ่งขายทำกำไร"
-        sl = curr_close + (1.5 * curr_atr)
-        tp = curr_close - (2.5 * curr_atr)
-    elif prev_ema9 >= prev_ema21 and curr_ema9 < curr_ema21 and curr_rsi > 35:
-        signal = "SELL"
-        reason = "Death Cross (EMA9 ตัดลง EMA21) เสี่ยงพักตัว"
-        sl = curr_close + (1.5 * curr_atr)
-        tp = curr_close - (2.5 * curr_atr)
+        signal, reason = "SELL", f"RSI Overbought ({curr_rsi:.1f}) พิจารณาขาย/ลดพอร์ต"
+    elif death_cross and curr_rsi > 35:
+        signal, reason = "SELL", "EMA9 ตัดลง EMA21 (Death Cross)"
+
+    digits = 4 if price < 1 else 2
+    entry = price if signal == "BUY" else None
+    risk = ATR_SL_MULTIPLIER * atr_value
+    sl = price - risk if signal == "BUY" else (price + risk if signal == "SELL" else None)
+    tp1 = price + TP_R_MULTIPLIERS[0] * risk if signal == "BUY" else None
+    tp2 = price + TP_R_MULTIPLIERS[1] * risk if signal == "BUY" else None
+    tp3 = price + TP_R_MULTIPLIERS[2] * risk if signal == "BUY" else None
 
     return {
-        "price": round(curr_close, 4 if curr_close < 1 else 2),
+        "price": round(price, digits),
         "change_pct": round(pct_change, 2),
         "rsi": round(curr_rsi, 1),
         "vol_ratio": round(vol_ratio, 2),
         "signal": signal,
         "reason": reason,
-        "tp": round(tp, 4 if curr_close < 1 else 2) if tp > 0 else None,
-        "sl": round(sl, 4 if curr_close < 1 else 2) if sl > 0 else None
+        "score": score,
+        "entry": round(entry, digits) if entry is not None else None,
+        "tp1": round(tp1, digits) if tp1 is not None else None,
+        "tp2": round(tp2, digits) if tp2 is not None else None,
+        "tp3": round(tp3, digits) if tp3 is not None else None,
+        "tp": round(tp2, digits) if tp2 is not None else None,
+        "sl": round(sl, digits) if sl is not None else None,
+        "risk_reward": "1:1 / 1:2 / 1:3" if signal == "BUY" else None,
+        "atr": round(atr_value, digits),
+        "candle_closed": True
     }
 
 def send_discord_alert(item):
     if not DISCORD_WEBHOOK:
         return
-    
+    if item["signal"] not in ("BUY", "SELL"):
+        return
     is_buy = item["signal"] == "BUY"
-    color = 0x10B981 if is_buy else 0xEF4444  # เขียว / แดง
-    emoji = "🟢 สัญญาณเข้าซื้อ (BUY)" if is_buy else "🔴 สัญญาณขายทำกำไร (SELL)"
+    color = 0x10B981 if is_buy else 0xEF4444
     currency = "THB" if item["market"] == "THAI" else ("USDT" if item["market"] == "CRYPTO" else "USD")
-
+    fields = [
+        {"name": "ราคาล่าสุด", "value": f"`{item['price']} {currency}`", "inline": True},
+        {"name": "คะแนน", "value": f"`{item['score']}/100`", "inline": True},
+        {"name": "RSI", "value": f"`{item['rsi']}`", "inline": True}
+    ]
+    if is_buy:
+        fields += [
+            {"name": "Entry", "value": f"`{item['entry']}`", "inline": True},
+            {"name": "TP1 / TP2 / TP3", "value": f"`{item['tp1']} / {item['tp2']} / {item['tp3']}`", "inline": False},
+            {"name": "Stop Loss", "value": f"`{item['sl']}`", "inline": True},
+            {"name": "Risk/Reward", "value": item["risk_reward"], "inline": True}
+        ]
     embed = {
-        "title": f"{emoji} : {item['symbol']} ({item['market']})",
-        "description": f"**เหตุผล:** {item['reason']}",
+        "title": f"{'🟢 BUY' if is_buy else '🔴 SELL'}: {item['symbol']} ({item['market']})",
+        "description": item["reason"] + "\nวิเคราะห์จากแท่งเทียนที่ปิดแล้วเท่านั้น",
         "color": color,
-        "fields": [
-            {"name": "💰 ราคาปัจจุบัน", "value": f"`{item['price']} {currency}` ({item['change_pct']:+}%)", "inline": True},
-            {"name": "📊 RSI (14)", "value": f"`{item['rsi']}`", "inline": True},
-            {"name": "🔥 Volume Spike", "value": f"`{item['vol_ratio']}x`", "inline": True},
-            {"name": "🎯 เป้าทำกำไร (TP)", "value": f"`{item['tp']}`", "inline": True},
-            {"name": "🛡️ จุดตัดขาดทุน (SL)", "value": f"`{item['sl']}`", "inline": True}
-        ],
-        "footer": {"text": f"AI Market Radar • Timeframe 15m"}
+        "fields": fields,
+        "footer": {"text": "Market Scanner • 15m • ATR-based levels"}
     }
     try:
-        requests.post(DISCORD_WEBHOOK, json={"embeds": [embed]}, timeout=10)
-    except Exception as e:
-        print(f"Discord Error: {e}")
+        response = requests.post(DISCORD_WEBHOOK, json={"embeds": [embed]}, timeout=10)
+        response.raise_for_status()
+    except Exception as exc:
+        print(f"Discord Error: {exc}")
 
 def main():
     tz_bkk = timezone(timedelta(hours=7))
     now_bkk = datetime.now(tz_bkk)
     now_ts = time.time()
-
     watchlist = load_watchlist()
     state = load_json(STATE_FILE, {})
     results = []
 
     for market, symbols in watchlist.items():
-        print(f"Scanning {market}...")
+        print(f"Scanning {market}: {len(symbols)} symbols")
         for sym in symbols:
             try:
                 if market == "CRYPTO":
@@ -191,46 +212,42 @@ def main():
                 else:
                     df = fetch_stock_klines(sym)
                     display_sym = sym.replace(".BK", "")
-
                 metrics = calculate_indicators(df)
                 if not metrics:
+                    print(f"Skip {sym}: insufficient/invalid candles")
                     continue
-
-                item = {
-                    "symbol": display_sym,
-                    "raw_symbol": sym,
-                    "market": market,
-                    **metrics
-                }
+                item = {"symbol": display_sym, "raw_symbol": sym, "market": market, **metrics}
                 results.append(item)
 
-                if item["signal"] in ["BUY", "SELL"]:
+                if item["signal"] in ("BUY", "SELL"):
                     state_key = f"{sym}_{item['signal']}"
                     last_alert = state.get(state_key, 0)
-                    if (now_ts - last_alert) > (COOLDOWN_HOURS * 3600):
+                    if now_ts - last_alert > COOLDOWN_HOURS * 3600:
                         send_discord_alert(item)
                         state[state_key] = now_ts
-                        time.sleep(0.5)
-
-            except Exception as e:
-                print(f"Error scanning {sym}: {e}")
+                        time.sleep(0.3)
+            except Exception as exc:
+                print(f"Error scanning {sym}: {exc}")
 
     priority = {"BUY": 0, "SELL": 1, "WATCH": 2}
-    results.sort(key=lambda x: (priority[x["signal"]], -abs(x["change_pct"])))
-
+    results.sort(key=lambda x: (priority.get(x["signal"], 3), -x["score"], -abs(x["change_pct"])))
+    buy_items = [x for x in results if x["signal"] == "BUY"]
     output_payload = {
         "updated_at": now_bkk.strftime("%Y-%m-%d %H:%M:%S (UTC+7)"),
+        "timeframe": "15m",
+        "method": "Closed candles only; EMA9/21 + RSI14 + Volume + ATR14",
         "summary": {
             "total": len(results),
-            "buy": sum(1 for r in results if r["signal"] == "BUY"),
-            "sell": sum(1 for r in results if r["signal"] == "SELL")
+            "buy": sum(1 for x in results if x["signal"] == "BUY"),
+            "sell": sum(1 for x in results if x["signal"] == "SELL"),
+            "watch": sum(1 for x in results if x["signal"] == "WATCH")
         },
+        "top10": buy_items[:10],
         "items": results
     }
-
     save_json(OUTPUT_FILE, output_payload)
     save_json(STATE_FILE, state)
-    print("Scan completed successfully.")
+    print(f"Scan completed: {len(results)} assets, BUY={output_payload['summary']['buy']}")
 
 if __name__ == "__main__":
     main()
