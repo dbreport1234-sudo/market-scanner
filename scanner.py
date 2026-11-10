@@ -69,6 +69,37 @@ def fetch_stock_klines(ticker, interval="15m", period="5d"):
         df = df.iloc[:-1]
     return df
 
+def build_chart_candles(df, market, limit=60):
+    """Return closed OHLC candles in Lightweight Charts format."""
+    if df is None or df.empty:
+        return []
+    rows = []
+    source = df.tail(limit)
+    for index, row in source.iterrows():
+        try:
+            if market == "CRYPTO":
+                timestamp = int(float(row["Time"]) / 1000)
+            else:
+                stamp = pd.Timestamp(index)
+                if stamp.tzinfo is None:
+                    stamp = stamp.tz_localize("UTC")
+                timestamp = int(stamp.timestamp())
+            candle = {
+                "time": timestamp,
+                "open": float(row["Open"]),
+                "high": float(row["High"]),
+                "low": float(row["Low"]),
+                "close": float(row["Close"])
+            }
+            if all(np.isfinite(candle[key]) for key in ("open", "high", "low", "close")):
+                rows.append(candle)
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+    # Lightweight Charts requires unique, ascending timestamps.
+    unique = {item["time"]: item for item in rows}
+    return [unique[key] for key in sorted(unique)]
+
+
 def calculate_indicators(df):
     if df is None or len(df) < 35:
         return None
@@ -216,7 +247,7 @@ def main():
                 if not metrics:
                     print(f"Skip {sym}: insufficient/invalid candles")
                     continue
-                item = {"symbol": display_sym, "raw_symbol": sym, "market": market, **metrics}
+                item = {"symbol": display_sym, "raw_symbol": sym, "market": market, "candles": build_chart_candles(df, market), **metrics}
                 results.append(item)
 
                 if item["signal"] in ("BUY", "SELL"):
@@ -234,7 +265,7 @@ def main():
     buy_items = [x for x in results if x["signal"] == "BUY"]
     output_payload = {
         "updated_at": now_bkk.strftime("%Y-%m-%d %H:%M:%S (UTC+7)"),
-        "timeframe": "15m",
+        "timeframe": "15m",\n        "refresh_interval_minutes": 15,
         "method": "Closed candles only; EMA9/21 + RSI14 + Volume + ATR14",
         "summary": {
             "total": len(results),
