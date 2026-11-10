@@ -88,7 +88,7 @@
 
     <div class="flex justify-between items-center mb-3">
       <h2 class="text-sm font-semibold text-slate-200">รายการสัญญาณ</h2>
-      <span id="resultCount" class="text-xs text-slate-500">0 รายการ</span>
+      <div class="flex items-center gap-2"><span id="resultCount" class="text-xs text-slate-500">0 รายการ</span><button id="listViewBtn" class="rounded-lg border border-indigo-500 bg-indigo-600 px-3 py-2 text-xs text-white" onclick="setViewList()">รายการ</button><button id="chartsViewBtn" class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-300" onclick="setViewCharts()">กราฟทุกตัว</button></div>
     </div>
 
     <!-- Mobile cards -->
@@ -119,6 +119,8 @@
       </div>
     </section>
 
+    <section id="chartsView" class="hidden mb-6"><p class="text-xs text-slate-400 mb-3">กราฟแท่งเทียน 15 นาที • ทุกสินทรัพย์ที่ผ่านการสแกน</p><div id="chartGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"></div></section>
+
     <footer class="text-center text-slate-600 text-xs mt-6">Market Scanner • ข้อมูลเพื่อประกอบการตัดสินใจลงทุน ไม่ใช่คำแนะนำการลงทุน</footer>
   </main>
 
@@ -126,6 +128,8 @@
     let allItems = [];
     let currentMarket = 'ALL';
     let currentSignal = 'ALL';
+    let currentView = 'list';
+    let lastDataUpdated = null;
 
     function escapeHTML(value) {
       return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -236,6 +240,71 @@
       }
       mobile.innerHTML = filtered.map(renderMobileCard).join('');
       table.innerHTML = filtered.map(renderDesktopRow).join('');
+      if (currentView === 'charts') renderCharts(filtered);
+    }
+
+
+    function setViewList() { setView('list'); }
+    function setViewCharts() { setView('charts'); }
+
+    function setView(view) {
+      currentView = view;
+      const mobile = document.getElementById('mobileList');
+      const desktop = document.querySelector('section.hidden.md\\:block');
+      const charts = document.getElementById('chartsView');
+      mobile.style.display = view === 'list' ? '' : 'none';
+      if (desktop) desktop.style.display = view === 'list' ? '' : 'none';
+      charts.classList.toggle('hidden', view !== 'charts');
+      document.getElementById('listViewBtn').className = view === 'list'
+        ? 'rounded-lg border border-indigo-500 bg-indigo-600 px-3 py-2 text-xs text-white'
+        : 'rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-300';
+      document.getElementById('chartsViewBtn').className = view === 'charts'
+        ? 'rounded-lg border border-indigo-500 bg-indigo-600 px-3 py-2 text-xs text-white'
+        : 'rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-300';
+      if (view === 'charts') renderTable();
+    }
+
+    function makeCandleSvg(candles) {
+      if (!Array.isArray(candles) || candles.length < 2) {
+        return '<div class="h-36 flex items-center justify-center text-xs text-slate-500">รอข้อมูลกราฟจากรอบสแกนถัดไป</div>';
+      }
+      const data = candles.slice(-60);
+      const min = Math.min.apply(null, data.map(c => Number(c.low)));
+      const max = Math.max.apply(null, data.map(c => Number(c.high)));
+      const range = Math.max(max - min, Math.abs(max) * 0.001, 0.000001);
+      const w = 340, h = 150, pad = 10, plotH = h - pad * 2;
+      const step = (w - pad * 2) / data.length;
+      const y = value => pad + (max - Number(value)) / range * plotH;
+      let shapes = '';
+      for (let i = 0; i < data.length; i++) {
+        const c = data[i];
+        const x = pad + i * step + step / 2;
+        const up = Number(c.close) >= Number(c.open);
+        const color = up ? '#10b981' : '#f43f5e';
+        const bodyTop = Math.min(y(c.open), y(c.close));
+        const bodyHeight = Math.max(1.5, Math.abs(y(c.open) - y(c.close)));
+        const bodyWidth = Math.max(2, Math.min(6, step * 0.65));
+        shapes += '<line x1="' + x.toFixed(1) + '" y1="' + y(c.high).toFixed(1) + '" x2="' + x.toFixed(1) + '" y2="' + y(c.low).toFixed(1) + '" stroke="' + color + '" stroke-width="1.2"/>';
+        shapes += '<rect x="' + (x - bodyWidth / 2).toFixed(1) + '" y="' + bodyTop.toFixed(1) + '" width="' + bodyWidth.toFixed(1) + '" height="' + bodyHeight.toFixed(1) + '" fill="' + color + '" rx="0.7"/>';
+      }
+      return '<svg viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="กราฟแท่งเทียน" style="width:100%;height:150px;background:#0b1220;border-radius:9px">' +
+        '<line x1="0" y1="45" x2="' + w + '" y2="45" stroke="#263244"/><line x1="0" y1="100" x2="' + w + '" y2="100" stroke="#263244"/>' + shapes + '</svg>';
+    }
+
+    function renderCharts(items) {
+      const grid = document.getElementById('chartGrid');
+      if (!items.length) {
+        grid.innerHTML = '<div class="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-slate-500">ไม่พบสินทรัพย์ที่ตรงกับเงื่อนไข</div>';
+        return;
+      }
+      grid.innerHTML = items.map(item => {
+        const signalColor = item.signal === 'BUY' ? 'text-emerald-400' : item.signal === 'SELL' ? 'text-rose-400' : 'text-slate-400';
+        return '<article class="bg-slate-900 border border-slate-800 rounded-xl p-3 min-w-0">' +
+          '<div class="flex justify-between items-start gap-2 mb-2"><div class="min-w-0"><div class="font-bold text-white truncate">' + escapeHTML(item.symbol) + '</div><div class="text-xs text-slate-500">' + marketName(item.market) + ' · TF 15m</div></div><span class="text-xs font-bold ' + signalColor + '">' + escapeHTML(item.signal) + '</span></div>' +
+          '<div class="flex justify-between text-xs mb-2"><span class="text-slate-400">ราคา <b class="text-white">' + escapeHTML(item.price) + '</b></span><span class="text-amber-300">Score ' + escapeHTML(item.score ?? 0) + '/100</span></div>' +
+          makeCandleSvg(item.candles) +
+          '<div class="text-xs text-slate-400 mt-2">RSI ' + escapeHTML(item.rsi) + ' · ' + escapeHTML(item.reason) + '</div></article>';
+      }).join('');
     }
 
     async function loadData() {
@@ -243,6 +312,8 @@
         const res = await fetch('data.json?t=' + Date.now(), { cache: 'no-store' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
+        if (data.updated_at && data.updated_at === lastDataUpdated) return;
+        lastDataUpdated = data.updated_at || null;
         document.getElementById('updatedAt').textContent = data.updated_at || '-';
         document.getElementById('statTotal').textContent = data.summary?.total ?? 0;
         document.getElementById('statBuy').textContent = data.summary?.buy ?? 0;
@@ -257,6 +328,7 @@
 
     updateFilterButtons();
     loadData();
+    setInterval(loadData, 60000);
   </script>
 </body>
 </html>
