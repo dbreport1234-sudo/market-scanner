@@ -1,6 +1,26 @@
 [
-  "DELTA.BK", "PTG.BK", "CCET.BK", "PTT.BK", "AOT.BK", 
+  "DELTA.BK", "PTG.BK", "CCET.BK", "PTT.BK", "AOT.BK",
   "ADVANC.BK", "CPALL.BK", "KBANK.BK", "SCB.BK", "BDMS.BK",
   "GULF.BK", "TRUE.BK", "MINT.BK", "HANA.BK", "KCE.BK",
-  "PTTEP.BK", "BBL.BK", "KTB.BK", "CRC.BK", "CPN.BK"
+  "PTTEP.BK", "BBL.BK", "KTB.BK", "CRC.BK", "CPN.BK",
+
+  "SCC.BK", "BAY.BK", "TTB.BK", "PTTGC.BK", "CPF.BK",
+  "BH.BK", "CPAXT.BK", "OR.BK", "THAI.BK", "GPSC.BK",
+  "IVL.BK", "TLI.BK", "TOP.BK", "SCGP.BK", "AWC.BK",
+  "KKP.BK", "TISCO.BK", "BEM.BK", "KTC.BK", "HMPRO.BK",
+
+  "TCAP.BK", "BJC.BK", "RATCH.BK", "COM7.BK", "WHA.BK",
+  "EGCO.BK", "MTC.BK", "BCP.BK", "CENTEL.BK", "BGRIM.BK",
+  "TFG.BK", "SPRC.BK", "OSP.BK", "BANPU.BK", "TU.BK",
+  "CBG.BK", "ITC.BK", "IRPC.BK", "TIDLOR.BK", "SCCC.BK",
+
+  "GUNKUL.BK", "BTG.BK", "LH.BK", "GLOBAL.BK", "BA.BK",
+  "TTW.BK", "MBK.BK", "BLA.BK", "SAWAD.BK", "PLANB.BK",
+  "RCL.BK", "TOA.BK", "AMATA.BK", "MEGA.BK", "SPALI.BK",
+  "CK.BK", "STA.BK", "CREDIT.BK", "BTS.BK", "BCH.BK",
+
+  "WHAUP.BK", "TASCO.BK", "LHFG.BK", "STGT.BK", "TVO.BK",
+  "SIRI.BK", "AP.BK", "AEONTS.BK", "BCPG.BK", "AAV.BK",
+  "EA.BK", "ERW.BK", "JMT.BK", "MOSHI.BK", "ROJNA.BK",
+  "SNNP.BK", "TKN.BK", "ICHI.BK", "JMART.BK", "CHG.BK"
 ]
