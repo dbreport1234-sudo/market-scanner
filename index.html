@@ -2,61 +2,103 @@
 <html lang="th" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dime & Crypto AI Radar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f19" />
+  <title>Multi-Market Signal Radar</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Prompt', sans-serif; background-color: #0b0f19; color: #e2e8f0; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Prompt', sans-serif; background:#0b0f19; color:#e2e8f0; -webkit-tap-highlight-color:transparent; }
+    button, input { font:inherit; }
+    .safe-wrap { padding-left:max(12px,env(safe-area-inset-left)); padding-right:max(12px,env(safe-area-inset-right)); }
+    .filter-btn { min-height:40px; white-space:nowrap; }
+    .filter-btn.active { background:#4f46e5; color:#fff; border-color:#6366f1; }
+    .signal-btn.active { background:#334155; color:#fff; border-color:#64748b; }
+    .asset-card { background:linear-gradient(145deg,#111827,#0f172a); border:1px solid #263244; border-radius:16px; padding:14px; min-width:0; }
+    .asset-card.buy { border-left:3px solid #10b981; }
+    .asset-card.sell { border-left:3px solid #f43f5e; }
+    .metric-label { color:#94a3b8; font-size:11px; }
+    .metric-value { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-variant-numeric:tabular-nums; }
+    .level-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+    .level { background:#0b1220; border:1px solid #263244; border-radius:9px; padding:8px; min-width:0; }
+    .level span:last-child { display:block; overflow-wrap:anywhere; font-size:12px; font-weight:600; }
+    .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    table { min-width:1050px; }
+    th { white-space:nowrap; }
+    td { vertical-align:top; }
+    @media (max-width:640px) {
+      .page-shell { padding:12px 10px calc(24px + env(safe-area-inset-bottom)); }
+      .brand-title { font-size:21px; line-height:1.25; }
+      .summary-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+      .summary-card { padding:11px 9px; border-radius:12px; }
+      .summary-number { font-size:22px; }
+      .filter-row { flex-wrap:nowrap; overflow-x:auto; padding-bottom:5px; scrollbar-width:none; }
+      .filter-row::-webkit-scrollbar { display:none; }
+      .filter-btn { padding:8px 12px; font-size:12px; }
+      .search-input { width:100%; min-height:44px; }
+    }
+    @media (min-width:641px) and (max-width:900px) {
+      .summary-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    }
   </style>
 </head>
-<body class="min-h-screen p-4 md:p-8">
-  <div class="max-w-6xl mx-auto">
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-      <div>
-        <h1 class="text-2xl md:text-3xl font-bold text-white flex items-center gap-2">
-          📡 Multi-Market Signal Radar
-        </h1>
-        <p class="text-slate-400 text-sm mt-1">สแกนจังหวะซื้อ-ขาย หุ้นไทย • หุ้นต่างประเทศ • คริปโต อัตโนมัติ (TF 15m)</p>
+<body class="min-h-screen">
+  <main class="page-shell max-w-7xl mx-auto px-4 py-6 md:px-8 md:py-8">
+    <header class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+      <div class="min-w-0">
+        <h1 class="brand-title text-2xl md:text-3xl font-bold text-white">📡 Multi-Market Signal Radar</h1>
+        <p class="text-slate-400 text-xs sm:text-sm mt-1">หุ้นไทย • หุ้นสหรัฐฯ • คริปโต <span class="text-indigo-300">TF 15m</span></p>
       </div>
-      <div class="text-xs bg-slate-800/80 border border-slate-700 px-3 py-2 rounded-lg text-slate-300">
+      <div class="text-xs bg-slate-800/80 border border-slate-700 px-3 py-2.5 rounded-lg text-slate-300 w-full sm:w-auto">
         อัปเดตล่าสุด: <span id="updatedAt" class="text-emerald-400 font-medium">กำลังโหลด...</span>
       </div>
-    </div>
+    </header>
 
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-3 gap-4 mb-6">
-      <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+    <section class="summary-grid grid grid-cols-3 gap-4 mb-5">
+      <div class="summary-card bg-slate-900 border border-slate-800 p-4 rounded-xl">
         <div class="text-slate-400 text-xs">สแกนทั้งหมด</div>
-        <div id="statTotal" class="text-2xl font-bold text-white mt-1">-</div>
+        <div id="statTotal" class="summary-number text-2xl font-bold text-white mt-1">-</div>
       </div>
-      <div class="bg-emerald-950/30 border border-emerald-800/50 p-4 rounded-xl">
-        <div class="text-emerald-400 text-xs">🟢 น่าเข้าซื้อ (BUY)</div>
-        <div id="statBuy" class="text-2xl font-bold text-emerald-400 mt-1">-</div>
+      <div class="summary-card bg-emerald-950/30 border border-emerald-800/50 p-4 rounded-xl">
+        <div class="text-emerald-400 text-xs">🟢 BUY</div>
+        <div id="statBuy" class="summary-number text-2xl font-bold text-emerald-400 mt-1">-</div>
       </div>
-      <div class="bg-rose-950/30 border border-rose-800/50 p-4 rounded-xl">
-        <div class="text-rose-400 text-xs">🔴 น่าขายทำกำไร (SELL)</div>
-        <div id="statSell" class="text-2xl font-bold text-rose-400 mt-1">-</div>
+      <div class="summary-card bg-rose-950/30 border border-rose-800/50 p-4 rounded-xl">
+        <div class="text-rose-400 text-xs">🔴 SELL</div>
+        <div id="statSell" class="summary-number text-2xl font-bold text-rose-400 mt-1">-</div>
       </div>
+    </section>
+
+    <section class="bg-slate-900/70 border border-slate-800 rounded-xl p-3 sm:p-4 mb-5">
+      <div class="filter-row flex flex-wrap gap-2 mb-3" id="marketFilters">
+        <button data-market="ALL" onclick="setMarketFilter('ALL')" class="filter-btn market-btn active rounded-lg border border-slate-700 px-4 py-2 text-sm">ทั้งหมด</button>
+        <button data-market="THAI" onclick="setMarketFilter('THAI')" class="filter-btn market-btn rounded-lg border border-slate-700 bg-slate-800 text-slate-300 px-4 py-2 text-sm">🇹🇭 หุ้นไทย</button>
+        <button data-market="US" onclick="setMarketFilter('US')" class="filter-btn market-btn rounded-lg border border-slate-700 bg-slate-800 text-slate-300 px-4 py-2 text-sm">🇺🇸 หุ้นสหรัฐฯ</button>
+        <button data-market="CRYPTO" onclick="setMarketFilter('CRYPTO')" class="filter-btn market-btn rounded-lg border border-slate-700 bg-slate-800 text-slate-300 px-4 py-2 text-sm">🪙 คริปโต</button>
+      </div>
+      <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+        <div class="flex gap-2">
+          <button data-signal="ALL" onclick="setSignalFilter('ALL')" class="filter-btn signal-btn active rounded-lg border border-slate-700 px-3 py-2 text-xs">ทุกสถานะ</button>
+          <button data-signal="ACTION" onclick="setSignalFilter('ACTION')" class="filter-btn signal-btn rounded-lg border border-slate-700 bg-slate-800 text-amber-300 px-3 py-2 text-xs">⚡ BUY / SELL</button>
+        </div>
+        <input id="searchInput" class="search-input sm:ml-auto bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 sm:max-w-xs" type="search" placeholder="ค้นหาหุ้น เช่น PTT, AAPL, BTC..." oninput="renderTable()" />
+      </div>
+    </section>
+
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-sm font-semibold text-slate-200">รายการสัญญาณ</h2>
+      <span id="resultCount" class="text-xs text-slate-500">0 รายการ</span>
     </div>
 
-    <!-- Filters -->
-    <div class="flex flex-wrap gap-2 mb-6">
-      <button onclick="setMarketFilter('ALL')" class="market-btn bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium">ทั้งหมด</button>
-      <button onclick="setMarketFilter('THAI')" class="market-btn bg-slate-800 text-slate-300 hover:bg-slate-700 px-4 py-1.5 rounded-lg text-sm">🇹🇭 หุ้นไทย (SET)</button>
-      <button onclick="setMarketFilter('US')" class="market-btn bg-slate-800 text-slate-300 hover:bg-slate-700 px-4 py-1.5 rounded-lg text-sm">🇺🇸 หุ้นสหรัฐฯ</button>
-      <button onclick="setMarketFilter('CRYPTO')" class="market-btn bg-slate-800 text-slate-300 hover:bg-slate-700 px-4 py-1.5 rounded-lg text-sm">🪙 คริปโต</button>
-      
-      <div class="ml-auto flex gap-2">
-        <button onclick="setSignalFilter('ALL')" class="sig-btn bg-slate-700 text-white px-3 py-1.5 rounded-lg text-xs">ทุกสถานะ</button>
-        <button onclick="setSignalFilter('ACTION')" class="sig-btn bg-slate-800 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs">⚡ เฉพาะจุดเข้าซื้อ/ขาย</button>
-      </div>
-    </div>
+    <!-- Mobile cards -->
+    <section id="mobileList" class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:hidden">
+      <div class="asset-card text-center text-slate-500">กำลังโหลดข้อมูล...</div>
+    </section>
 
-    <!-- Table -->
-    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-      <div class="overflow-x-auto">
+    <!-- Desktop/tablet table -->
+    <section class="hidden md:block bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+      <div class="table-wrap">
         <table class="w-full text-left border-collapse">
           <thead>
             <tr class="bg-slate-800/60 text-slate-400 text-xs uppercase border-b border-slate-800">
@@ -65,7 +107,8 @@
               <th class="p-4 text-right">ราคาล่าสุด</th>
               <th class="p-4 text-right">RSI (14)</th>
               <th class="p-4 text-center">สัญญาณ</th>
-              <th class="p-4">Entry / TP1-3 / SL</th>\n              <th class="p-4 text-right">คะแนน</th>
+              <th class="p-4">Entry / TP1-3 / SL</th>
+              <th class="p-4 text-right">คะแนน</th>
               <th class="p-4">บทวิเคราะห์</th>
             </tr>
           </thead>
@@ -74,94 +117,145 @@
           </tbody>
         </table>
       </div>
-    </div>
-  </div>
+    </section>
+
+    <footer class="text-center text-slate-600 text-xs mt-6">Market Scanner • ข้อมูลเพื่อประกอบการตัดสินใจลงทุน ไม่ใช่คำแนะนำการลงทุน</footer>
+  </main>
 
   <script>
     let allItems = [];
     let currentMarket = 'ALL';
     let currentSignal = 'ALL';
 
-    async function loadData() {
-      try {
-        // เติม timestamp ป้องกัน Browser จำ Cache เก่า
-        const res = await fetch(`data.json?t=${Date.now()}`);
-        const data = await res.json();
-        
-        document.getElementById('updatedAt').textContent = data.updated_at;
-        document.getElementById('statTotal').textContent = data.summary.total;
-        document.getElementById('statBuy').textContent = data.summary.buy;
-        document.getElementById('statSell').textContent = data.summary.sell;
-        
-        allItems = data.items;
-        renderTable();
-      } catch (e) {
-        document.getElementById('tableBody').innerHTML = 
-          `<tr><td colspan="8" class="p-8 text-center text-rose-400">ยังไม่มีข้อมูล data.json (กรุณารัน GitHub Actions รอบแรกก่อน)</td></tr>`;
+    function escapeHTML(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+      })[ch]);
+    }
+
+    function marketName(market) {
+      return market === 'THAI' ? '🇹🇭 หุ้นไทย' : market === 'US' ? '🇺🇸 หุ้นสหรัฐฯ' : '🪙 คริปโต';
+    }
+
+    function signalClass(signal) {
+      return signal === 'BUY'
+        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+        : signal === 'SELL'
+        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+        : 'bg-slate-800 text-slate-400 border border-slate-700';
+    }
+
+    function levelMarkup(item) {
+      if (item.signal === 'BUY') {
+        return `
+          <div class="level-grid mt-3">
+            <div class="level"><span class="metric-label text-sky-300">ENTRY</span><span class="text-sky-300">${escapeHTML(item.entry ?? item.price)}</span></div>
+            <div class="level"><span class="metric-label text-rose-400">STOP LOSS</span><span class="text-rose-400">${escapeHTML(item.sl ?? '-')}</span></div>
+            <div class="level"><span class="metric-label text-emerald-400">TAKE PROFIT 1</span><span class="text-emerald-400">${escapeHTML(item.tp1 ?? '-')}</span></div>
+            <div class="level"><span class="metric-label text-emerald-400">TAKE PROFIT 2</span><span class="text-emerald-400">${escapeHTML(item.tp2 ?? '-')}</span></div>
+            <div class="level"><span class="metric-label text-emerald-400">TAKE PROFIT 3</span><span class="text-emerald-400">${escapeHTML(item.tp3 ?? '-')}</span></div>
+            <div class="level"><span class="metric-label">RISK / REWARD</span><span class="text-slate-200">${escapeHTML(item.risk_reward ?? '-')}</span></div>
+          </div>`;
       }
+      return item.sl ? `<div class="mt-3 text-xs">Stop/ระดับอ้างอิง: <span class="text-rose-400 font-semibold">${escapeHTML(item.sl)}</span></div>` : '';
+    }
+
+    function renderMobileCard(item) {
+      const isBuy = item.signal === 'BUY';
+      const changeColor = Number(item.change_pct) >= 0 ? 'text-emerald-400' : 'text-rose-400';
+      return `
+        <article class="asset-card ${isBuy ? 'buy' : item.signal === 'SELL' ? 'sell' : ''}">
+          <div class="flex justify-between items-start gap-2">
+            <div class="min-w-0">
+              <div class="text-white font-bold text-lg truncate">${escapeHTML(item.symbol)}</div>
+              <div class="text-slate-500 text-xs mt-0.5">${marketName(item.market)}</div>
+            </div>
+            <span class="shrink-0 rounded-full px-3 py-1 text-xs font-bold ${signalClass(item.signal)}">${escapeHTML(item.signal)}</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 mt-4">
+            <div><div class="metric-label">ราคาล่าสุด</div><div class="metric-value text-white text-sm mt-1">${escapeHTML(item.price)}</div><div class="text-xs ${changeColor}">${Number(item.change_pct) > 0 ? '+' : ''}${escapeHTML(item.change_pct)}%</div></div>
+            <div><div class="metric-label">RSI (14)</div><div class="metric-value text-sm mt-1 ${item.rsi < 35 ? 'text-emerald-400' : item.rsi > 70 ? 'text-rose-400' : 'text-slate-200'}">${escapeHTML(item.rsi)}</div></div>
+            <div><div class="metric-label">คะแนน</div><div class="metric-value text-amber-300 text-sm font-bold mt-1">${escapeHTML(item.score ?? 0)}/100</div></div>
+          </div>
+          ${levelMarkup(item)}
+          <div class="border-t border-slate-700/70 mt-3 pt-3 text-xs text-slate-400 leading-relaxed">${escapeHTML(item.reason)}</div>
+        </article>`;
+    }
+
+    function renderDesktopRow(item) {
+      const changeColor = Number(item.change_pct) >= 0 ? 'text-emerald-400' : 'text-rose-400';
+      const levels = item.signal === 'BUY'
+        ? `<span class="text-sky-300">Entry: ${escapeHTML(item.entry ?? item.price)}</span><br><span class="text-emerald-400">TP1: ${escapeHTML(item.tp1)}</span><br><span class="text-emerald-400">TP2: ${escapeHTML(item.tp2)}</span><br><span class="text-emerald-400">TP3: ${escapeHTML(item.tp3)}</span><br><span class="text-rose-400">SL: ${escapeHTML(item.sl)}</span><br><span class="text-slate-500">R:R ${escapeHTML(item.risk_reward || '-')}</span>`
+        : (item.sl ? `<span class="text-rose-400">SL: ${escapeHTML(item.sl)}</span>` : '-');
+      return `
+        <tr class="hover:bg-slate-800/40 transition">
+          <td class="p-4 font-bold text-white">${escapeHTML(item.symbol)}</td>
+          <td class="p-4 text-xs text-slate-400">${marketName(item.market)}</td>
+          <td class="p-4 text-right font-mono"><div class="text-white">${escapeHTML(item.price)}</div><div class="text-xs ${changeColor}">${Number(item.change_pct) > 0 ? '+' : ''}${escapeHTML(item.change_pct)}%</div></td>
+          <td class="p-4 text-right font-mono ${item.rsi < 35 ? 'text-emerald-400 font-bold' : item.rsi > 70 ? 'text-rose-400 font-bold' : 'text-slate-300'}">${escapeHTML(item.rsi)}</td>
+          <td class="p-4 text-center"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${signalClass(item.signal)}">${escapeHTML(item.signal)}</span></td>
+          <td class="p-4 font-mono text-xs leading-5">${levels}</td>
+          <td class="p-4 text-right font-mono font-bold text-amber-300">${escapeHTML(item.score ?? 0)}/100</td>
+          <td class="p-4 text-slate-300 text-xs max-w-xs">${escapeHTML(item.reason)}</td>
+        </tr>`;
+    }
+
+    function updateFilterButtons() {
+      document.querySelectorAll('.market-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.market === currentMarket));
+      document.querySelectorAll('.signal-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.signal === currentSignal));
     }
 
     function setMarketFilter(market) {
       currentMarket = market;
-      document.querySelectorAll('.market-btn').forEach(btn => {
-        btn.className = "market-btn bg-slate-800 text-slate-300 hover:bg-slate-700 px-4 py-1.5 rounded-lg text-sm";
-      });
-      event.target.className = "market-btn bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium";
+      updateFilterButtons();
       renderTable();
     }
 
-    function setSignalFilter(sig) {
-      currentSignal = sig;
+    function setSignalFilter(signal) {
+      currentSignal = signal;
+      updateFilterButtons();
       renderTable();
     }
 
     function renderTable() {
-      const tbody = document.getElementById('tableBody');
+      const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
       const filtered = allItems.filter(item => {
         const matchMarket = currentMarket === 'ALL' || item.market === currentMarket;
-        const matchSig = currentSignal === 'ALL' || item.signal !== 'WATCH';
-        return matchMarket && matchSig;
+        const matchSignal = currentSignal === 'ALL' || item.signal !== 'WATCH';
+        const matchSearch = !query || String(item.symbol || '').toLowerCase().includes(query) || String(item.raw_symbol || '').toLowerCase().includes(query);
+        return matchMarket && matchSignal && matchSearch;
       });
 
-      if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500">ไม่พบรายการที่ตรงกับเงื่อนไข</td></tr>`;
+      document.getElementById('resultCount').textContent = filtered.length.toLocaleString('th-TH') + ' รายการ';
+      const mobile = document.getElementById('mobileList');
+      const table = document.getElementById('tableBody');
+      if (!filtered.length) {
+        mobile.innerHTML = '<div class="asset-card text-center text-slate-500 sm:col-span-2">ไม่พบรายการที่ตรงกับเงื่อนไข</div>';
+        table.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500">ไม่พบรายการที่ตรงกับเงื่อนไข</td></tr>';
         return;
       }
-
-      tbody.innerHTML = filtered.map(item => {
-        const badgeClass = item.signal === 'BUY' 
-          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
-          : item.signal === 'SELL' 
-          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40' 
-          : 'bg-slate-800 text-slate-400';
-
-        const changeColor = item.change_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
-        const marketBadge = item.market === 'THAI' ? '🇹🇭 TH' : item.market === 'US' ? '🇺🇸 US' : '🪙 CRYPTO';
-        const tpsl = item.signal === 'BUY' ? `<span class="text-sky-300">Entry: ${item.entry}</span><br><span class="text-emerald-400">TP1: ${item.tp1}</span><br><span class="text-emerald-400">TP2: ${item.tp2}</span><br><span class="text-emerald-400">TP3: ${item.tp3}</span><br><span class="text-rose-400">SL: ${item.sl}</span><br><span class="text-slate-500">R:R ${item.risk_reward || '-'}</span>` : (item.sl ? `<span class="text-rose-400">SL: ${item.sl}</span>` : '-');
-
-        return `
-          <tr class="hover:bg-slate-800/40 transition">
-            <td class="p-4 font-bold text-white">${item.symbol}</td>
-            <td class="p-4 text-xs text-slate-400">${marketBadge}</td>
-            <td class="p-4 text-right font-mono">
-              <div class="text-white">${item.price}</div>
-              <div class="text-xs ${changeColor}">${item.change_pct > 0 ? '+' : ''}${item.change_pct}%</div>
-            </td>
-            <td class="p-4 text-right font-mono ${item.rsi < 35 ? 'text-emerald-400 font-bold' : item.rsi > 70 ? 'text-rose-400 font-bold' : 'text-slate-300'}">
-              ${item.rsi}
-            </td>
-            <td class="p-4 text-center">
-              <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${badgeClass}">
-                ${item.signal}
-              </span>
-            </td>
-            <td class="p-4 font-mono text-xs">${tpsl}</td>
-            <td class="p-4 text-right font-mono font-bold text-amber-300">${item.score ?? 0}/100</td>\n            <td class="p-4 text-slate-300 text-xs max-w-xs">${item.reason}</td>
-          </tr>
-        `;
-      }).join('');
+      mobile.innerHTML = filtered.map(renderMobileCard).join('');
+      table.innerHTML = filtered.map(renderDesktopRow).join('');
     }
 
+    async function loadData() {
+      try {
+        const res = await fetch('data.json?t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        document.getElementById('updatedAt').textContent = data.updated_at || '-';
+        document.getElementById('statTotal').textContent = data.summary?.total ?? 0;
+        document.getElementById('statBuy').textContent = data.summary?.buy ?? 0;
+        document.getElementById('statSell').textContent = data.summary?.sell ?? 0;
+        allItems = Array.isArray(data.items) ? data.items : [];
+        renderTable();
+      } catch (error) {
+        document.getElementById('mobileList').innerHTML = '<div class="asset-card text-center text-rose-400 sm:col-span-2">ยังไม่มีข้อมูล data.json กรุณารัน GitHub Actions รอบแรก</div>';
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="8" class="p-8 text-center text-rose-400">ยังไม่มีข้อมูล data.json กรุณารัน GitHub Actions รอบแรก</td></tr>';
+      }
+    }
+
+    updateFilterButtons();
     loadData();
   </script>
 </body>
