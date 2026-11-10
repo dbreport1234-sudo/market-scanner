@@ -1,0 +1,36 @@
+name: Automatic Watchlist Discovery
+
+on:
+  schedule:
+    # Update market lists daily at 07:30 Thailand time (00:30 UTC).
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install discovery dependency
+        run: pip install requests
+
+      - name: Discover and update market watchlists
+        run: python discover.py
+
+      - name: Commit watchlists and discovery report
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add lists/thai_stocks.json lists/us_stocks.json lists/crypto.json discovery_report.json
+          git diff --cached --quiet || (git commit -m "chore: refresh automatic market watchlists" && git push)
