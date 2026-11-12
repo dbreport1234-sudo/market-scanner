@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-11 13:54:57 (UTC+7)",
+  "updated_at": "2026-11-12 09:59:44 (UTC+7)",
   "limits": {
     "thai": 150,
     "us": 150,
@@ -24,10 +24,48 @@
     "US": {
       "count": 150,
       "added": [
-        "CORZ"
+        "AXTI",
+        "COHR",
+        "DVN",
+        "ERAS",
+        "FIS",
+        "FPS",
+        "GLW",
+        "GLXY",
+        "HPQ",
+        "KEY",
+        "KMI",
+        "NVO",
+        "PEP",
+        "PINS",
+        "QCOM",
+        "S",
+        "STUB",
+        "TTEK",
+        "UAA",
+        "WU"
       ],
       "removed": [
-        "ASX"
+        "AKAM",
+        "BKR",
+        "CCC",
+        "CLF",
+        "CNH",
+        "CPNG",
+        "CVNA",
+        "DBX",
+        "DNN",
+        "FIG",
+        "FOXA",
+        "GFL",
+        "JBS",
+        "NLY",
+        "OKLO",
+        "PPL",
+        "RDW",
+        "RUN",
+        "SBS",
+        "ZETA"
       ],
       "source": "Nasdaq Trader symbol directory + Yahoo Finance most-active ranking"
     },
