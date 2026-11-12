@@ -30,6 +30,10 @@
     .level-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
     .level { background:#0b1220; border:1px solid #263244; border-radius:9px; padding:8px; min-width:0; }
     .level span:last-child { display:block; overflow-wrap:anywhere; font-size:12px; font-weight:600; }
+    .calc-input { width:100%; min-width:0; background:#0b1220; border:1px solid #334155; border-radius:9px; padding:9px 10px; color:#f8fafc; outline:none; }
+    .calc-input:focus { border-color:#818cf8; }
+    .calc-result { background:#0b1220; border:1px solid #263244; border-radius:9px; padding:9px; min-width:0; }
+    .calc-result strong { display:block; overflow-wrap:anywhere; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; }
     .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
     table { min-width:1050px; }
     th { white-space:nowrap; }
@@ -81,6 +85,37 @@
         <div class="text-rose-400 text-xs">🔴 SELL</div>
         <div id="statSell" class="summary-number text-2xl font-bold text-rose-400 mt-1">-</div>
       </div>
+    </section>
+
+    <!-- Thai stock position sizing and P/L calculator -->
+    <section class="bg-slate-900/80 border border-indigo-500/30 rounded-xl p-3 sm:p-4 mb-5">
+      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
+        <div>
+          <h2 class="text-sm font-semibold text-white">🧮 คำนวณเงินลงทุนและกำไร–ขาดทุน (หุ้นไทย)</h2>
+          <p class="text-xs text-slate-400 mt-1">ปรับเงินทุนและขนาด Lot ได้ทันที ผลคำนวณจะอัปเดตในสัญญาณ BUY หุ้นไทยแต่ละรายการ</p>
+        </div>
+        <span class="text-[10px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 rounded-full px-2.5 py-1">คำนวณแบบจำลอง · ไม่ส่งคำสั่งซื้อขาย</span>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <label class="text-xs text-slate-400">เงินทุน (บาท)
+          <input id="calcCapital" class="calc-input mt-1" type="number" min="1" step="100" value="5000" inputmode="decimal">
+        </label>
+        <label class="text-xs text-slate-400">หุ้นขั้นต่ำต่อ 1 Lot
+          <input id="calcLotSize" class="calc-input mt-1" type="number" min="1" step="1" value="100" inputmode="numeric">
+        </label>
+        <label class="text-xs text-slate-400">ค่าคอมมิชชันต่อข้าง (%)
+          <input id="calcCommission" class="calc-input mt-1" type="number" min="0" max="10" step="0.01" value="0.25" inputmode="decimal">
+        </label>
+        <label class="text-xs text-slate-400">ขาดทุนสูงสุด/รายการ (บาท)
+          <input id="calcMaxLoss" class="calc-input mt-1" type="number" min="1" step="10" value="100" inputmode="decimal">
+        </label>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
+        <div class="calc-result"><span class="metric-label">BUY หุ้นไทยทั้งหมด</span><strong id="calcBuyCount" class="text-white mt-1">0</strong></div>
+        <div class="calc-result"><span class="metric-label">ผ่านเงื่อนไขเงินทุน/ความเสี่ยง</span><strong id="calcEligibleCount" class="text-emerald-400 mt-1">0</strong></div>
+        <div class="calc-result col-span-2 sm:col-span-1"><span class="metric-label">ไม่ผ่านเงื่อนไขขั้นต่ำ</span><strong id="calcBlockedCount" class="text-rose-400 mt-1">0</strong></div>
+      </div>
+      <p class="text-[10px] text-slate-500 mt-3 leading-relaxed">คำนวณจาก Entry, TP1–TP3 และ SL ของสัญญาณล่าสุด โดยหักค่าคอมมิชชันทั้งขาซื้อและขาขายแล้ว ยังไม่รวม VAT และค่าธรรมเนียมตลาด/ชำระราคาอื่น ๆ หุ้นสหรัฐฯ และคริปโตไม่ใช้การคำนวณนี้</p>
     </section>
 
     <section class="bg-slate-900/70 border border-slate-800 rounded-xl p-3 sm:p-4 mb-5">
@@ -177,6 +212,91 @@
       return item.sl ? `<div class="mt-3 text-xs">Stop/ระดับอ้างอิง: <span class="text-rose-400 font-semibold">${escapeHTML(item.sl)}</span></div>` : '';
     }
 
+    function readCalcSettings() {
+      const value = id => Number(document.getElementById(id)?.value);
+      return {
+        capital: value('calcCapital'),
+        lotSize: Math.floor(value('calcLotSize')),
+        fee: value('calcCommission') / 100,
+        maxLoss: value('calcMaxLoss')
+      };
+    }
+
+    function formatTHB(value) {
+      return Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ฿';
+    }
+
+    function calculateThaiPlan(item) {
+      if (item.market !== 'THAI' || item.signal !== 'BUY') return null;
+      const cfg = readCalcSettings();
+      const entry = Number(item.entry ?? item.price);
+      const sl = Number(item.sl);
+      const tp1 = Number(item.tp1), tp2 = Number(item.tp2), tp3 = Number(item.tp3);
+      if (![cfg.capital, cfg.lotSize, cfg.fee, cfg.maxLoss, entry, sl, tp1, tp2, tp3].every(Number.isFinite) ||
+          cfg.capital <= 0 || cfg.lotSize < 1 || cfg.fee < 0 || cfg.maxLoss <= 0 || entry <= 0 || sl <= 0 || sl >= entry) {
+        return { eligible:false, reason:'กรุณาตรวจสอบค่าตั้งต้นหรือระดับราคา' };
+      }
+
+      const costPerLot = entry * cfg.lotSize * (1 + cfg.fee);
+      const netLossPerShare = (entry - sl) + (entry + sl) * cfg.fee;
+      if (costPerLot <= 0 || netLossPerShare <= 0) return { eligible:false, reason:'คำนวณขนาดสถานะไม่ได้' };
+
+      const affordableLots = Math.floor(cfg.capital / costPerLot);
+      const riskLots = Math.floor(cfg.maxLoss / (netLossPerShare * cfg.lotSize));
+      const lots = Math.max(0, Math.min(affordableLots, riskLots));
+      const shares = lots * cfg.lotSize;
+      if (shares < cfg.lotSize) {
+        return { eligible:false, reason:'เงินทุนไม่พอซื้อขั้นต่ำ หรือ SL เกินวงเงินขาดทุนที่กำหนด',
+          affordableLots, riskLots, minLotCost:costPerLot, minLotLoss:netLossPerShare * cfg.lotSize };
+      }
+
+      const buyValue = entry * shares;
+      const buyFee = buyValue * cfg.fee;
+      const capitalUsed = buyValue + buyFee;
+      const netAt = target => (target - entry) * shares - (entry + target) * shares * cfg.fee;
+      const netSL = netAt(sl);
+      // Guard against floating-point edge cases at the risk limit.
+      if (netSL < -cfg.maxLoss - 0.000001) {
+        return { eligible:false, reason:'ขาดทุนที่ SL เกินวงเงินที่ตั้งไว้' };
+      }
+      return {
+        eligible:true, lots, shares, capitalUsed, buyFee,
+        tp1:netAt(tp1), tp2:netAt(tp2), tp3:netAt(tp3), sl:netSL,
+        maxLoss:cfg.maxLoss
+      };
+    }
+
+    function thaiPlanMarkup(item) {
+      const plan = calculateThaiPlan(item);
+      if (!plan) return '';
+      if (!plan.eligible) {
+        return `<div class="mt-3 rounded-lg border border-rose-500/30 bg-rose-950/20 p-2 text-xs text-rose-300">
+          <b>ยังไม่ผ่านเงื่อนไขซื้อขั้นต่ำ</b><div class="mt-1">${escapeHTML(plan.reason)}</div>
+          ${plan.minLotCost ? `<div class="mt-1 text-slate-400">ต้นทุนขั้นต่ำโดยประมาณ ${formatTHB(plan.minLotCost)} · เสี่ยงที่ SL ${formatTHB(plan.minLotLoss)}</div>` : ''}
+        </div>`;
+      }
+      return `<div class="mt-3 rounded-lg border border-indigo-500/30 bg-indigo-950/20 p-2.5">
+        <div class="flex flex-wrap justify-between gap-1 text-xs"><b class="text-indigo-200">แผนเงินลงทุน</b><span class="text-slate-300">${plan.lots.toLocaleString('th-TH')} Lot · ${plan.shares.toLocaleString('th-TH')} หุ้น</span></div>
+        <div class="text-[11px] text-slate-400 mt-1">ใช้เงินรวมค่าคอมฯ ซื้อ ${formatTHB(plan.capitalUsed)}</div>
+        <div class="grid grid-cols-2 gap-1.5 mt-2">
+          <div class="calc-result"><span class="metric-label text-emerald-400">กำไรสุทธิ TP1</span><strong class="text-emerald-400 mt-1">+${formatTHB(plan.tp1)}</strong></div>
+          <div class="calc-result"><span class="metric-label text-emerald-400">กำไรสุทธิ TP2</span><strong class="text-emerald-400 mt-1">+${formatTHB(plan.tp2)}</strong></div>
+          <div class="calc-result"><span class="metric-label text-emerald-400">กำไรสุทธิ TP3</span><strong class="text-emerald-400 mt-1">+${formatTHB(plan.tp3)}</strong></div>
+          <div class="calc-result"><span class="metric-label text-rose-400">ขาดทุนสุทธิ SL</span><strong class="text-rose-400 mt-1">${formatTHB(plan.sl)}</strong></div>
+        </div>
+      </div>`;
+    }
+
+    function renderCapitalSummary() {
+      const thaiBuys = allItems.filter(item => item.market === 'THAI' && item.signal === 'BUY');
+      const plans = thaiBuys.map(calculateThaiPlan);
+      const eligible = plans.filter(plan => plan && plan.eligible).length;
+      const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+      setText('calcBuyCount', thaiBuys.length.toLocaleString('th-TH'));
+      setText('calcEligibleCount', eligible.toLocaleString('th-TH'));
+      setText('calcBlockedCount', (thaiBuys.length - eligible).toLocaleString('th-TH'));
+    }
+
     function renderMobileCard(item) {
       const isBuy = item.signal === 'BUY';
       const changeColor = Number(item.change_pct) >= 0 ? 'text-emerald-400' : 'text-rose-400';
@@ -195,6 +315,7 @@
             <div><div class="metric-label">คะแนน</div><div class="metric-value text-amber-300 text-sm font-bold mt-1">${escapeHTML(item.score ?? 0)}/100</div></div>
           </div>
           ${levelMarkup(item)}
+          ${thaiPlanMarkup(item)}
           <div class="border-t border-slate-700/70 mt-3 pt-3 text-xs text-slate-400 leading-relaxed">${escapeHTML(item.reason)}</div>
         </article>`;
     }
@@ -211,7 +332,7 @@
           <td class="p-4 text-right font-mono"><div class="text-white">${escapeHTML(item.price)}</div><div class="text-xs ${changeColor}">${Number(item.change_pct) > 0 ? '+' : ''}${escapeHTML(item.change_pct)}%</div></td>
           <td class="p-4 text-right font-mono ${item.rsi < 35 ? 'text-emerald-400 font-bold' : item.rsi > 70 ? 'text-rose-400 font-bold' : 'text-slate-300'}">${escapeHTML(item.rsi)}</td>
           <td class="p-4 text-center"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${signalClass(item.signal)}">${escapeHTML(item.signal)}</span></td>
-          <td class="p-4 font-mono text-xs leading-5">${levels}</td>
+          <td class="p-4 font-mono text-xs leading-5">${levels}${thaiPlanMarkup(item)}</td>
           <td class="p-4 text-right font-mono font-bold text-amber-300">${escapeHTML(item.score ?? 0)}/100</td>
           <td class="p-4 text-slate-300 text-xs max-w-xs">${escapeHTML(item.reason)}</td>
         </tr>`;
@@ -235,6 +356,7 @@
     }
 
     function renderTable() {
+      renderCapitalSummary();
       const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
       const filtered = allItems.filter(item => {
         const matchMarket = currentMarket === 'ALL' || item.market === currentMarket;
@@ -379,6 +501,15 @@
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.warn('PWA service worker:', err)));
     }
+    ['calcCapital', 'calcLotSize', 'calcCommission', 'calcMaxLoss'].forEach(id => {
+      const input = document.getElementById(id);
+      const saved = localStorage.getItem('marketRadar_' + id);
+      if (saved !== null && Number.isFinite(Number(saved))) input.value = saved;
+      input.addEventListener('input', () => {
+        localStorage.setItem('marketRadar_' + id, input.value);
+        renderTable();
+      });
+    });
     updateFilterButtons();
     loadData();
     setInterval(loadData, 60000);
