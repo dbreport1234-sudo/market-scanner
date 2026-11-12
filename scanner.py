@@ -265,7 +265,8 @@ def main():
     buy_items = [x for x in results if x["signal"] == "BUY"]
     output_payload = {
         "updated_at": now_bkk.strftime("%Y-%m-%d %H:%M:%S (UTC+7)"),
-        "timeframe": "15m",\n        "refresh_interval_minutes": 15,
+        "timeframe": "15m",
+        "refresh_interval_minutes": 15,
         "method": "Closed candles only; EMA9/21 + RSI14 + Volume + ATR14",
         "summary": {
             "total": len(results),
