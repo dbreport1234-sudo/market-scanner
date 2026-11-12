@@ -242,8 +242,10 @@
       if (costPerLot <= 0 || netLossPerShare <= 0) return { eligible:false, reason:'คำนวณขนาดสถานะไม่ได้' };
 
       const affordableLots = Math.floor(cfg.capital / costPerLot);
-      const riskLots = Math.floor(cfg.maxLoss / (netLossPerShare * cfg.lotSize));
-      const lots = Math.max(0, Math.min(affordableLots, riskLots));
+      const riskLots = Math.floor((cfg.maxLoss + 0.00000001) / (netLossPerShare * cfg.lotSize));
+      let lots = Math.max(0, Math.min(affordableLots, riskLots));
+      // Recheck the rounded lot count so floating-point edges never exceed the risk cap.
+      while (lots > 0 && netLossPerShare * cfg.lotSize * lots > cfg.maxLoss + 0.00000001) lots--;
       const shares = lots * cfg.lotSize;
       if (shares < cfg.lotSize) {
         return { eligible:false, reason:'เงินทุนไม่พอซื้อขั้นต่ำ หรือ SL เกินวงเงินขาดทุนที่กำหนด',
