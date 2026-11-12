@@ -14,6 +14,12 @@ COOLDOWN_HOURS = 4
 ATR_SL_MULTIPLIER = 1.5
 TP_R_MULTIPLIERS = (1.0, 2.0, 3.0)
 
+# Thai-stock position sizing defaults (the dashboard calculator can override these locally).
+THAI_CAPITAL = 5000.0
+THAI_COMMISSION_RATE = 0.0025  # per side; excludes VAT and other exchange fees
+THAI_LOT_SIZE = 100
+THAI_MAX_NET_LOSS = 100.0
+
 def load_json(filepath, default):
     if os.path.exists(filepath):
         try:
@@ -100,7 +106,81 @@ def build_chart_candles(df, market, limit=60):
     return [unique[key] for key in sorted(unique)]
 
 
-def calculate_indicators(df):
+
+def calculate_thai_trade_plan(entry, tp1, tp2, tp3, sl):
+    """Estimate Thai-stock position size and net P/L after buy/sell commission."""
+    try:
+        entry, tp1, tp2, tp3, sl = map(float, (entry, tp1, tp2, tp3, sl))
+    except (TypeError, ValueError):
+        return {"eligible": False, "reason": "ราคา Entry/TP/SL ไม่ถูกต้อง"}
+
+    values = (entry, tp1, tp2, tp3, sl)
+    if not all(np.isfinite(value) for value in values):
+        return {"eligible": False, "reason": "ราคา Entry/TP/SL ไม่ใช่ตัวเลข"}
+    if entry <= 0 or sl <= 0 or sl >= entry or min(tp1, tp2, tp3) <= entry:
+        return {"eligible": False, "reason": "ระดับราคาไม่ถูกต้อง"}
+
+    lot_size = int(THAI_LOT_SIZE)
+    fee = float(THAI_COMMISSION_RATE)
+    capital = float(THAI_CAPITAL)
+    max_loss = float(THAI_MAX_NET_LOSS)
+    if lot_size < 1 or fee < 0 or capital <= 0 or max_loss <= 0:
+        return {"eligible": False, "reason": "ค่าตั้งค่าการลงทุนไม่ถูกต้อง"}
+
+    cost_per_lot = entry * lot_size * (1.0 + fee)
+    net_loss_per_share = (entry - sl) + (entry + sl) * fee
+    if cost_per_lot <= 0 or net_loss_per_share <= 0:
+        return {"eligible": False, "reason": "ไม่สามารถคำนวณขนาดการลงทุนได้"}
+
+    affordable_lots = int(np.floor((capital + 1e-9) / cost_per_lot))
+    risk_lots = int(np.floor((max_loss + 1e-9) / (net_loss_per_share * lot_size)))
+    lots = max(0, min(affordable_lots, risk_lots))
+
+    # Recheck actual rounded lots to avoid floating-point boundary overruns.
+    while lots > 0:
+        shares = lots * lot_size
+        capital_used = entry * shares * (1.0 + fee)
+        net_sl = (sl - entry) * shares - (entry + sl) * shares * fee
+        if capital_used <= capital + 1e-7 and net_sl >= -max_loss - 1e-7:
+            break
+        lots -= 1
+
+    if lots < 1:
+        return {
+            "eligible": False,
+            "reason": "เงินทุนไม่พอซื้อขั้นต่ำ หรือขาดทุนสุทธิที่ SL เกินวงเงิน",
+            "min_lot_cost": round(cost_per_lot, 2),
+            "min_lot_loss": round(net_loss_per_share * lot_size, 2),
+            "capital": capital,
+            "max_loss": max_loss,
+            "lot_size": lot_size
+        }
+
+    shares = lots * lot_size
+    buy_value = entry * shares
+    buy_fee = buy_value * fee
+    capital_used = buy_value + buy_fee
+
+    def net_pnl(target):
+        return (target - entry) * shares - (entry + target) * shares * fee
+
+    return {
+        "eligible": True,
+        "capital": capital,
+        "lot_size": lot_size,
+        "lots": lots,
+        "shares": shares,
+        "capital_used": round(capital_used, 2),
+        "buy_fee": round(buy_fee, 2),
+        "tp1_net": round(net_pnl(tp1), 2),
+        "tp2_net": round(net_pnl(tp2), 2),
+        "tp3_net": round(net_pnl(tp3), 2),
+        "sl_net": round(net_pnl(sl), 2),
+        "max_loss": max_loss,
+        "commission_rate": fee
+    }
+
+def calculate_indicators(df, market="THAI"):
     if df is None or len(df) < 35:
         return None
     df = df.copy()
@@ -188,6 +268,8 @@ def calculate_indicators(df):
         "tp": round(tp2, digits) if tp2 is not None else None,
         "sl": round(sl, digits) if sl is not None else None,
         "risk_reward": "1:1 / 1:2 / 1:3" if signal == "BUY" else None,
+        "trade_plan": calculate_thai_trade_plan(entry, tp1, tp2, tp3, sl)
+                      if signal == "BUY" and market == "THAI" else None,
         "atr": round(atr_value, digits),
         "candle_closed": True
     }
@@ -212,6 +294,21 @@ def send_discord_alert(item):
             {"name": "Stop Loss", "value": f"`{item['sl']}`", "inline": True},
             {"name": "Risk/Reward", "value": item["risk_reward"], "inline": True}
         ]
+        plan = item.get("trade_plan")
+        if item["market"] == "THAI" and plan:
+            if plan.get("eligible"):
+                fields += [
+                    {"name": "ขนาดลงทุน", "value": f"`{plan['lots']} Lot / {plan['shares']:,} หุ้น`", "inline": True},
+                    {"name": "ใช้เงินรวมค่าคอมฯ ซื้อ", "value": f"`{plan['capital_used']:,.2f} THB`", "inline": True},
+                    {"name": "กำไรสุทธิ TP1 / TP2 / TP3", "value": f"`{plan['tp1_net']:,.2f} / {plan['tp2_net']:,.2f} / {plan['tp3_net']:,.2f} THB`", "inline": False},
+                    {"name": "ขาดทุนสุทธิ SL", "value": f"`{plan['sl_net']:,.2f} THB`", "inline": True}
+                ]
+            else:
+                fields.append({
+                    "name": "แผนลงทุนหุ้นไทย",
+                    "value": f"`ไม่ผ่านเงื่อนไข` — {plan.get('reason', 'ตรวจสอบเงินทุน/ความเสี่ยง')}",
+                    "inline": False
+                })
     embed = {
         "title": f"{'🟢 BUY' if is_buy else '🔴 SELL'}: {item['symbol']} ({item['market']})",
         "description": item["reason"] + "\nวิเคราะห์จากแท่งเทียนที่ปิดแล้วเท่านั้น",
@@ -243,7 +340,7 @@ def main():
                 else:
                     df = fetch_stock_klines(sym)
                     display_sym = sym.replace(".BK", "")
-                metrics = calculate_indicators(df)
+                metrics = calculate_indicators(df, market=market)
                 if not metrics:
                     print(f"Skip {sym}: insufficient/invalid candles")
                     continue
