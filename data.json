@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-16 03:27:11 (UTC+7)",
+  "updated_at": "2026-11-16 07:05:51 (UTC+7)",
   "timeframe": "15m",
   "refresh_interval_minutes": 15,
   "method": "Closed candles only; EMA9/21 + RSI14 + Volume + ATR14",
