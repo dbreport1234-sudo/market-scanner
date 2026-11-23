@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-22 14:15:33 (UTC+7)",
+  "updated_at": "2026-11-23 14:59:03 (UTC+7)",
   "limits": {
     "thai": 150,
     "us": 150,
@@ -7,11 +7,11 @@
   },
   "min_crypto_quote_volume_usdt": 5000000.0,
   "sources": {
-    "THAI": "SET public stock quote list + Yahoo Finance most-active ranking"
+    "THAI": "SET public stock quote list + Yahoo Finance most-active ranking",
+    "US": "Nasdaq Trader symbol directory + Yahoo Finance most-active ranking"
   },
   "errors": {
     "THAI ranking": "No Yahoo active symbols matched the official TH universe",
-    "US discovery": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
     "CRYPTO discovery": "451 Client Error:  for url: https://api.binance.com/api/v3/exchangeInfo"
   },
   "markets": {
@@ -25,7 +25,7 @@
       "count": 150,
       "added": [],
       "removed": [],
-      "source": "Existing list retained; source unavailable"
+      "source": "Nasdaq Trader symbol directory + Yahoo Finance most-active ranking"
     },
     "CRYPTO": {
       "count": 20,
