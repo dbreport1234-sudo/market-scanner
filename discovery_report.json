@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-23 14:59:03 (UTC+7)",
+  "updated_at": "2026-11-24 17:14:31 (UTC+7)",
   "limits": {
     "thai": 150,
     "us": 150,
@@ -23,8 +23,48 @@
     },
     "US": {
       "count": 150,
-      "added": [],
-      "removed": [],
+      "added": [
+        "ABEV",
+        "AMAT",
+        "AXTI",
+        "CNH",
+        "CRWD",
+        "DELL",
+        "FPS",
+        "GLXY",
+        "HPQ",
+        "IOVA",
+        "IP",
+        "KMI",
+        "MARA",
+        "MDLN",
+        "NLY",
+        "NVO",
+        "S",
+        "UNH",
+        "ZS"
+      ],
+      "removed": [
+        "ABVX",
+        "AES",
+        "BB",
+        "BILL",
+        "BKR",
+        "C",
+        "COMP",
+        "EQX",
+        "GAP",
+        "GIS",
+        "HIMS",
+        "INFY",
+        "MOS",
+        "MRK",
+        "PYPL",
+        "TU",
+        "TXN",
+        "WFC",
+        "XPEV"
+      ],
       "source": "Nasdaq Trader symbol directory + Yahoo Finance most-active ranking"
     },
     "CRYPTO": {
